@@ -81,10 +81,7 @@ textarea{height:60px;resize:none;}
   z-index:9999;
   pointer-events:none;
 }
-#toast.err{
-  background:rgba(200,80,80,0.85);
-  color:white;
-}
+#toast.err{background:rgba(200,80,80,0.85);color:white;}
 
 .tableWrapper{width:100%;overflow-x:auto;}
 
@@ -184,23 +181,17 @@ td{padding:10px;border-bottom:1px solid #E5E5E5;word-break:break-word;}
 </div>
 
 
-
 <script>
 let data=[];
 
 /* ---- Toast ---- */
-function showToast(message,isErr){
+function showToast(msg,isErr){
   const t=document.getElementById("toast");
-  t.innerHTML=message;
-  if(isErr){
-    t.classList.add("err");
-  }else{
-    t.classList.remove("err");
-  }
+  t.innerHTML=msg;
+  t.classList.toggle("err",!!isErr);
   t.style.opacity=1;
   setTimeout(()=>{t.style.opacity=0;},1000);
 }
-
 
 /* ---- 類型切換 ---- */
 document.querySelectorAll("input[name='fType']").forEach(r=>{
@@ -212,33 +203,29 @@ document.querySelectorAll("input[name='fType']").forEach(r=>{
   });
 });
 
+/* ---- 自動查股價（FINNHUB） ---- */
+const API_KEY = "d4kjl11r01qvpdokli30d4kjl11r01qvpdokli3g";
 
-/* ---- 自動查股價（codetabs） ---- */
 document.getElementById("fCode").addEventListener("blur", async function(){
 
   let code = this.value.trim();
   if(!code) return;
 
   let symbol = "";
-
-  if(/^\d+$/.test(code)){      
+  if(/^\d+$/.test(code)){    
     symbol = code + ".TW";
-  } else {                     
+  } else {                    
     symbol = code.toUpperCase();
   }
 
-  const api = 
-`https://api.codetabs.com/v1/proxy/?quest=https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
+  const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`;
 
   try{
-    const res = await fetch(api);
+    const res = await fetch(url);
     const json = await res.json();
 
-    const result = json.quoteResponse?.result?.[0];
-    const price = result?.regularMarketPrice;
-
-    if(price){
-      const p = Number(price).toFixed(2);
+    if(json.c){
+      const p = Number(json.c).toFixed(2);
       document.getElementById("fPrice").value = p;
       showToast("取得股價："+p,false);
     }else{
@@ -249,7 +236,6 @@ document.getElementById("fCode").addEventListener("blur", async function(){
     showToast("查詢失敗",true);
   }
 });
-
 
 /* ---- 送出 ---- */
 document.getElementById("btnSubmit").onclick=function(){
@@ -291,7 +277,6 @@ document.getElementById("btnSubmit").onclick=function(){
   showToast("送出成功",false);
 };
 
-
 /* ---- Tabs ---- */
 document.querySelectorAll(".tab").forEach(t=>{
   t.addEventListener("click",()=>{
@@ -301,7 +286,6 @@ document.querySelectorAll(".tab").forEach(t=>{
     document.getElementById(t.dataset.tab).classList.add("active");
   });
 });
-
 
 /* ---- Render ---- */
 function renderRows(){

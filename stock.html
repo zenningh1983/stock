@@ -9,7 +9,7 @@
     body {
         margin: 0;
         padding: 20px;
-        font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemSystem, "Helvetica Neue", Helvetica, Arial, sans-serif;
         background: #f5f5f5;
         color: #333;
     }
@@ -281,27 +281,25 @@ function showToast(msg, success = true) {
     }, 1000);
 }
 
-/* ------------ 自動查股價（台灣證交所 MIS API） ------------ */
+/* ------------ 自動查股價（Yahoo TW API） ------------ */
 document.getElementById("symbol").addEventListener("blur", async function () {
     const raw = this.value.trim();
     if (!raw) return;
 
-    // 如果代號是純數字 → 自動補上 tse_xxxx.tw
-    let apiCode = /^\d+$/.test(raw) ? `tse_${raw}.tw` : raw;
+    // 純數字代號 → 不補 .TW → Yahoo TW API 自動辨識台股
+    let code = raw;
 
-    const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${apiCode}`;
+    const url = `https://tw.quote.finance.yahoo.net/quote/q?type=ta&sym=${code}`;
 
     try {
         const res = await fetch(url);
-        const data = await res.json();
+        const text = await res.text();
 
-        if (data.msgArray && data.msgArray.length > 0) {
-            const price = data.msgArray[0].z;
-            if (price && !isNaN(price)) {
-                document.getElementById("price").value = parseFloat(price).toFixed(2);
-            } else {
-                showToast("查不到價格", false);
-            }
+        // Yahoo TW 回傳是 JS 格式，要用 eval 解析
+        const data = eval("(" + text + ")");
+
+        if (data && data.c) {
+            document.getElementById("price").value = Number(data.c).toFixed(2);
         } else {
             showToast("查不到價格", false);
         }
@@ -321,7 +319,9 @@ function submitForm() {
     let amount = document.getElementById("amount").value;
     let note = document.getElementById("note").value;
 
-    if (!account || !symbol || !type || !date || (type !== "Bonus" && (!shares || !price)) || (type === "Bonus" && !amount)) {
+    if (!account || !symbol || !type || !date ||
+        (type !== "Bonus" && (!shares || !price)) ||
+        (type === "Bonus" && !amount)) {
         showToast("有欄位未填", false);
         return;
     }
@@ -360,5 +360,6 @@ function renderRecords() {
 
 renderRecords();
 </script>
+
 </body>
 </html>

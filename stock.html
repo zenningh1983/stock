@@ -25,6 +25,7 @@
         justify-content: center;
         gap: 20px;
         margin-bottom: 25px;
+        flex-wrap: wrap;
     }
 
     .tab {
@@ -213,11 +214,11 @@
         </div>
         <div>
             <label>單價</label>
-            <input id="price" type="number" step="0.01" placeholder="">
+            <input id="price" type="number" step="0.01">
         </div>
     </div>
 
-    <label>金額（股利時需填）</label>
+    <label>金額（股利需填）</label>
     <input id="amount" type="number" step="0.01">
 
     <label>備註</label>
@@ -228,8 +229,7 @@
 
 <!-- 我的庫存 -->
 <div class="section" id="overview" style="display:none;">
-    <h3>庫存總覽（簡易版）</h3>
-    <p>稍後可進階製作損益統計。</p>
+    <h3>庫存總覽（稍後擴充）</h3>
 </div>
 
 <!-- 明細 -->
@@ -281,22 +281,27 @@ function showToast(msg, success = true) {
     }, 1000);
 }
 
-/* ------------ 自動查股價 (Finnhub) ------------ */
+/* ------------ 自動查股價（台灣證交所 MIS API） ------------ */
 document.getElementById("symbol").addEventListener("blur", async function () {
     const raw = this.value.trim();
     if (!raw) return;
 
-    const isNumber = /^\d+$/.test(raw);
-    const symbol = isNumber ? raw + ".TW" : raw;
+    // 如果代號是純數字 → 自動補上 tse_xxxx.tw
+    let apiCode = /^\d+$/.test(raw) ? `tse_${raw}.tw` : raw;
 
-    const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=d4kjl11r01qvpdokli30d4kjl11r01qvpdokli3g`;
+    const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${apiCode}`;
 
     try {
         const res = await fetch(url);
         const data = await res.json();
 
-        if (data.c) {
-            document.getElementById("price").value = data.c.toFixed(2);
+        if (data.msgArray && data.msgArray.length > 0) {
+            const price = data.msgArray[0].z;
+            if (price && !isNaN(price)) {
+                document.getElementById("price").value = parseFloat(price).toFixed(2);
+            } else {
+                showToast("查不到價格", false);
+            }
         } else {
             showToast("查不到價格", false);
         }

@@ -1,0 +1,314 @@
+<!DOCTYPE html><html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>股票收益儀表板</title>
+
+<style>
+body{
+  font-family:'Noto Sans TC',sans-serif;
+  background:#F5F5F3;
+  margin:0;
+  padding:20px;
+  color:#333;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+h2{margin-bottom:14px;font-weight:600;text-align:center;}
+
+.tabs{
+  display:flex;gap:10px;margin-bottom:20px;justify-content:center;width:100%;max-width:1000px;
+}
+.tab{
+  padding:10px 20px;background:#D8D8D4;border-radius:6px;cursor:pointer;
+  color:#444;font-weight:600;transition:.2s;
+}
+.tab:hover{background:#C6C6C2;}
+.tab.active{background:#AFAFA8;color:white;}
+
+.tabContent{
+  display:none;
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  box-shadow:0 2px 5px #0002;
+  width:100%;
+  max-width:1000px;
+  box-sizing:border-box;
+}
+.tabContent.active{display:block;}
+
+.row{
+  display:flex;
+  align-items:center;
+  margin-bottom:14px;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.row label{width:90px;font-weight:600;}
+
+input,select,textarea{
+  padding:8px;border-radius:6px;border:1px solid #C8C8C5;flex:1;
+  font-size:14px;background:#FAFAF8;
+}
+
+textarea{height:60px;resize:none;}
+
+.type-option{display:flex;align-items:center;gap:6px;margin-right:10px;}
+
+.btn{
+  width:100%;padding:12px;border-radius:8px;background:#AFAFA8;
+  color:white;border:none;font-size:15px;cursor:pointer;font-weight:600;margin-top:10px;
+}
+.btn:hover{background:#8E8E88;}
+
+#toast{
+  position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  min-width:180px;
+  text-align:center;
+  background:rgba(180,180,170,0.85);
+  color:#333;
+  padding:16px 28px;
+  border-radius:14px;
+  font-size:16px;
+  opacity:0;
+  transition:opacity .25s;
+  z-index:9999;
+  pointer-events:none;
+}
+
+.tableWrapper{width:100%;overflow-x:auto;}
+
+table{
+  width:100%;min-width:700px;border-collapse:collapse;background:#FAFAF9;font-size:15px;
+}
+th{background:#D6D6D2;padding:10px;text-align:left;}
+td{padding:10px;border-bottom:1px solid #E5E5E5;word-break:break-word;}
+
+@media(max-width:600px){
+  .tabContent{max-width:420px;}
+  table{font-size:13px;}
+  th,td{padding:8px;}
+}
+</style>
+</head>
+
+<body>
+
+<h2>📈 股票收益儀表板</h2>
+<div id="toast"></div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="add">新增交易</div>
+  <div class="tab" data-tab="portfolio">我的庫存</div>
+</div>
+
+<div id="add" class="tabContent active">
+
+<h3>新增交易紀錄</h3>
+
+<div class="row">
+  <label>帳戶</label>
+  <select id="fAcc">
+    <option>國泰證券</option>
+    <option>元大證券</option>
+  </select>
+</div>
+
+<div class="row">
+  <label>代號</label>
+  <input id="fCode">
+</div>
+
+<div class="row">
+  <label>交易類型</label>
+  <div class="type-option"><input type="radio" name="fType" value="Buy" checked> Buy</div>
+  <div class="type-option"><input type="radio" name="fType" value="Sell"> Sell</div>
+  <div class="type-option"><input type="radio" name="fType" value="Bonus"> Bonus</div>
+</div>
+
+<div class="row">
+  <label>日期</label>
+  <input id="fDate" type="date">
+</div>
+
+<div class="row" id="rowQty">
+  <label>股數</label>
+  <input id="fQty" type="number" value="1000">
+</div>
+
+<div class="row" id="rowPrice">
+  <label>單價</label>
+  <input id="fPrice" type="number">
+</div>
+
+<div class="row" id="rowAmount" style="display:none;">
+  <label>金額</label>
+  <input id="fAmount" type="number">
+</div>
+
+<div class="row">
+  <label>備註</label>
+  <textarea id="fNote"></textarea>
+</div>
+
+<button class="btn" id="btnSubmit">送出</button>
+
+</div>
+
+
+<div id="portfolio" class="tabContent">
+<h3>全部明細</h3>
+
+<div class="tableWrapper">
+<table>
+<thead>
+<tr>
+<th>帳戶</th><th>代號</th><th>類型</th>
+<th>股數/金額</th><th>單價</th><th>日期</th><th>備註</th>
+</tr>
+</thead>
+<tbody id="allRows"></tbody>
+</table>
+</div>
+
+</div>
+
+
+
+<script>
+let data=[];
+
+/* ---- Toast ---- */
+function showToast(message,isErr){
+  const t=document.getElementById("toast");
+  t.innerHTML=message;
+  t.style.background=isErr?"rgba(200,80,80,0.85)":"rgba(180,180,170,0.85)";
+  t.style.color=isErr?"white":"#333";
+  t.style.opacity=1;
+
+  setTimeout(()=>{ t.style.opacity=0; },1000);
+}
+
+/* ---- 交易類型切換 ---- */
+document.querySelectorAll("input[name='fType']").forEach(r=>{
+  r.addEventListener("change",()=>{
+    const isBonus=r.value==="Bonus";
+    document.getElementById("rowQty").style.display=isBonus?"none":"flex";
+    document.getElementById("rowPrice").style.display=isBonus?"none":"flex";
+    document.getElementById("rowAmount").style.display=isBonus?"flex":"none";
+  });
+});
+
+/* ---- 自動查股價（CORS Proxy） ---- */
+document.getElementById("fCode").addEventListener("blur", async function(){
+
+  let code = this.value.trim();
+  if(!code) return;
+
+  let symbol = "";
+
+  if(/^\d+$/.test(code)){           /* 台股 */
+    symbol = code + ".TW";
+  } else {                          /* 美股 */
+    symbol = code.toUpperCase();
+  }
+
+  const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
+
+  try{
+    const res = await fetch(url);
+    const json = await res.json();
+
+    const price = json.quoteResponse.result[0]?.regularMarketPrice;
+
+    if(price){
+      const p = Number(price).toFixed(2);
+      document.getElementById("fPrice").value = p;
+      showToast(`取得股價：${p}`, false);
+    }else{
+      showToast("查不到股價", true);
+    }
+
+  }catch(e){
+    showToast("查詢失敗", true);
+  }
+});
+
+/* ---- 送出 ---- */
+document.getElementById("btnSubmit").onclick=function(){
+
+  const acc = document.getElementById("fAcc").value.trim();
+  const code = document.getElementById("fCode").value.trim();
+  const type = document.querySelector("input[name='fType']:checked").value;
+  const dateVal = document.getElementById("fDate").value;
+  const qtyVal = document.getElementById("fQty").value;
+  const priceVal = document.getElementById("fPrice").value;
+  const amountVal = document.getElementById("fAmount").value;
+  const noteVal = document.getElementById("fNote").value.trim();
+
+  if(type==="Buy"||type==="Sell"){
+    if(!acc||!code||!dateVal||!qtyVal||!priceVal){
+      showToast("缺少欄位",true);
+      return;
+    }
+  } else {
+    if(!acc||!code||!dateVal||!amountVal){
+      showToast("缺少欄位",true);
+      return;
+    }
+  }
+
+  const finalQty = (type==="Bonus")?0:Number(qtyVal);
+  const finalPrice = (type==="Bonus")?0:Number(priceVal);
+  const finalAmount = (type==="Bonus")?Number(amountVal):finalQty*finalPrice;
+
+  data.push({
+    acc,code,type,
+    qty:finalQty,price:finalPrice,
+    amount:finalAmount,
+    date:dateVal,
+    note:noteVal
+  });
+
+  renderRows();
+  showToast("送出成功",false);
+};
+
+/* ---- Tabs ---- */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(a=>a.classList.remove("active"));
+    document.querySelectorAll(".tabContent").forEach(c=>c.classList.remove("active"));
+    t.classList.add("active");
+    document.getElementById(t.dataset.tab).classList.add("active");
+  });
+});
+
+
+/* ---- Render 明細 ---- */
+function renderRows(){
+  let html="";
+  data.forEach(r=>{
+    html+=`
+    <tr>
+      <td>${r.acc}</td>
+      <td>${r.code}</td>
+      <td>${r.type}</td>
+      <td>${r.type==="Bonus"?r.amount:r.qty}</td>
+      <td>${r.type==="Bonus"?"-":r.price}</td>
+      <td>${r.date}</td>
+      <td>${r.note}</td>
+    </tr>`;
+  });
+  document.getElementById("allRows").innerHTML=html;
+}
+</script>
+
+</body>
+</html>
